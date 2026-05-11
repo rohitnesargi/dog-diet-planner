@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="glass-card" style="width: 100%; max-width: 900px; padding: 40px;">
+        <h1 class="page-title text-center">Vaccination Reminder</h1>
+        <p class="page-subtitle text-center">Keep track of your dog's vaccinations and never miss a shot.</p>
+
+        <div class="row mt-4">
+            <!-- Add New Record -->
+            <div class="col-md-5">
+                <div class="p-4 rounded h-100" style="background: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.4);">
+                    <h5 class="fw-bold mb-3">Add Record</h5>
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">Pet Name</label>
+                            <input type="text" name="pet_name" class="form-control" placeholder="Buddy" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Vaccine Name</label>
+                            <select name="vaccine" class="form-select" required>
+                                <option value="Rabies">Rabies</option>
+                                <option value="DHPP">DHPP (Distemper, Hepatitis, Parvo, Parainfluenza)</option>
+                                <option value="Bordetella">Bordetella (Kennel Cough)</option>
+                                <option value="Leptospirosis">Leptospirosis</option>
+                                <option value="Lyme Disease">Lyme Disease</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Date</label>
+                            <input type="date" name="date" class="form-control" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary-custom w-100">Schedule Vaccine</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- List of Records -->
+            <div class="col-md-7">
+                <div class="p-4 rounded h-100" style="background: rgba(255,255,255,0.8); border: 1px solid rgba(255,255,255,0.4);">
+                    <h5 class="fw-bold mb-3">Upcoming & History</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Pet</th>
+                                    <th>Vaccine</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for v in vaccinations %}
+                                <tr>
+                                    <td>{{ v.pet }}</td>
+                                    <td>{{ v.vaccine }}</td>
+                                    <td>{{ v.date }}</td>
+                                    <td><span class="badge bg-primary">{{ v.status }}</span></td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">No records found.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-4">
+            <a href="{{ url_for('services') }}" class="back-btn">⬅ Back to Services</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

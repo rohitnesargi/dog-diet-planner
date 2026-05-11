@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="glass-card" style="width: 100%; max-width: 800px; padding: 40px;">
+        <h1 class="page-title text-center">Disease Prediction</h1>
+        <p class="page-subtitle text-center">Select your dog's symptoms for a preliminary analysis.</p>
+
+        <form method="POST" class="mt-4">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="form-check p-3 rounded border" style="background: rgba(255,255,255,0.5);">
+                        <input class="form-check-input" type="checkbox" name="symptoms" value="coughing" id="coughing">
+                        <label class="form-check-label" for="coughing">Coughing</label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check p-3 rounded border" style="background: rgba(255,255,255,0.5);">
+                        <input class="form-check-input" type="checkbox" name="symptoms" value="lethargy" id="lethargy">
+                        <label class="form-check-label" for="lethargy">Lethargy</label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check p-3 rounded border" style="background: rgba(255,255,255,0.5);">
+                        <input class="form-check-input" type="checkbox" name="symptoms" value="vomiting" id="vomiting">
+                        <label class="form-check-label" for="vomiting">Vomiting</label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check p-3 rounded border" style="background: rgba(255,255,255,0.5);">
+                        <input class="form-check-input" type="checkbox" name="symptoms" value="diarrhea" id="diarrhea">
+                        <label class="form-check-label" for="diarrhea">Diarrhea</label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check p-3 rounded border" style="background: rgba(255,255,255,0.5);">
+                        <input class="form-check-input" type="checkbox" name="symptoms" value="fever" id="fever">
+                        <label class="form-check-label" for="fever">Fever</label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check p-3 rounded border" style="background: rgba(255,255,255,0.5);">
+                        <input class="form-check-input" type="checkbox" name="symptoms" value="sneezing" id="sneezing">
+                        <label class="form-check-label" for="sneezing">Sneezing</label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check p-3 rounded border" style="background: rgba(255,255,255,0.5);">
+                        <input class="form-check-input" type="checkbox" name="symptoms" value="itching" id="itching">
+                        <label class="form-check-label" for="itching">Itching</label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check p-3 rounded border" style="background: rgba(255,255,255,0.5);">
+                        <input class="form-check-input" type="checkbox" name="symptoms" value="loss_of_appetite" id="loss_of_appetite">
+                        <label class="form-check-label" for="loss_of_appetite">Loss of Appetite</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center mt-4">
+                <button type="submit" class="btn btn-primary-custom px-5">Analyze Symptoms</button>
+            </div>
+        </form>
+
+        {% if result %}
+        <div class="mt-5 p-4 rounded" style="background: rgba(255,255,255,0.9); border-left: 5px solid var(--primary-color);">
+            <h4 class="fw-bold text-danger">Probable Condition: {{ result.disease }}</h4>
+            <p class="mb-0 text-dark"><strong>Advice:</strong> {{ result.advice }}</p>
+            <div class="alert alert-warning mt-3 mb-0" role="alert">
+                <small>Disclaimer: This is an AI-generated prediction based on common symptoms. Always consult a professional veterinarian for an accurate diagnosis.</small>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="text-center mt-4">
+            <a href="{{ url_for('services') }}" class="back-btn">⬅ Back to Services</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

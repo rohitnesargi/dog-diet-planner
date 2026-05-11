@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="glass-card" style="width: 100%; max-width: 900px; padding: 40px;">
+        <h1 class="page-title text-center">Grooming Scheduler</h1>
+        <p class="page-subtitle text-center">Book your dog's next spa day and maintain their health and hygiene.</p>
+
+        <div class="row mt-4">
+            <!-- Schedule Session -->
+            <div class="col-md-5">
+                <div class="p-4 rounded h-100" style="background: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.4);">
+                    <h5 class="fw-bold mb-3">Schedule Session</h5>
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">Pet Name</label>
+                            <input type="text" name="pet_name" class="form-control" placeholder="Buddy" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Service Type</label>
+                            <select name="service" class="form-select" required>
+                                <option value="Full Grooming">Full Grooming</option>
+                                <option value="Bath & Brush">Bath & Brush</option>
+                                <option value="Nail Trimming">Nail Trimming</option>
+                                <option value="Ear Cleaning">Ear Cleaning</option>
+                                <option value="Hair Cut">Hair Cut</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Date</label>
+                            <input type="date" name="date" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Time</label>
+                            <input type="time" name="time" class="form-control" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary-custom w-100">Book Session</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- List of Sessions -->
+            <div class="col-md-7">
+                <div class="p-4 rounded h-100" style="background: rgba(255,255,255,0.8); border: 1px solid rgba(255,255,255,0.4);">
+                    <h5 class="fw-bold mb-3">Your Bookings</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Pet</th>
+                                    <th>Service</th>
+                                    <th>Date</th>
+                                    <th>Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for s in sessions %}
+                                <tr>
+                                    <td>{{ s.pet }}</td>
+                                    <td>{{ s.service }}</td>
+                                    <td>{{ s.date }}</td>
+                                    <td>{{ s.time }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">No sessions booked yet.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-4">
+            <a href="{{ url_for('services') }}" class="back-btn">⬅ Back to Services</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="glass-card" style="width: 100%; max-width: 900px; padding: 40px;">
+        <h1 class="page-title text-center mb-4">Identify Dog Breed Diet Planner</h1>
+        
+        <p style="font-size: 1.1rem; line-height: 1.8; color: var(--text-main); text-align: justify; margin-bottom: 30px;">
+            A dog breed identification and diet planning application is a valuable tool for dog owners, veterinarians, and animal enthusiasts. It utilizes artificial intelligence to accurately identify the breed of a dog based on uploaded images. By knowing the dog's breed, the app provides tailored dietary recommendations, portion sizes, and nutritional requirements. This helps in maintaining the dog's overall health, managing weight, and addressing specific dietary needs. With its comprehensive database and precise breed identification, the app simplifies the process of providing optimal nutrition and care for dogs. It empowers users to make informed decisions about their dog's diet and contributes to their overall well-being.
+        </p>
+
+        <div style="text-align: center;">
+            <a href="{{ url_for('index') }}" class="back-btn">⬅ Back to Homepage</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

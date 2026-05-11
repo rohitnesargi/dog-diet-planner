@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="glass-card" style="width: 100%; max-width: 1000px; padding: 40px;">
+        <h1 class="page-title text-center">Health Dashboard</h1>
+        <p class="page-subtitle text-center">A comprehensive overview of your dog's health and wellness.</p>
+
+        <div class="row g-4 mt-2">
+            <!-- Vaccination Card -->
+            <div class="col-md-4">
+                <div class="p-4 rounded text-center h-100" style="background: rgba(74, 108, 247, 0.1); border: 2px solid var(--primary-color);">
+                    <div style="font-size: 3rem; margin-bottom: 10px;">💉</div>
+                    <h4 class="fw-bold">Vaccinations</h4>
+                    <p class="text-muted">Stay updated on essential shots.</p>
+                    {% if vaccines %}
+                        <p class="mb-1"><strong>Latest:</strong> {{ vaccines[-1].vaccine }}</p>
+                        <p class="mb-3"><small>{{ vaccines[-1].date }}</small></p>
+                    {% else %}
+                        <p class="text-muted small mb-3">No data available.</p>
+                    {% endif %}
+                    <a href="{{ url_for('vaccination') }}" class="btn btn-sm btn-primary-custom">View All</a>
+                </div>
+            </div>
+
+            <!-- Grooming Card -->
+            <div class="col-md-4">
+                <div class="p-4 rounded text-center h-100" style="background: rgba(255, 193, 7, 0.1); border: 2px solid var(--secondary-color);">
+                    <div style="font-size: 3rem; margin-bottom: 10px;">✂️</div>
+                    <h4 class="fw-bold">Grooming</h4>
+                    <p class="text-muted">Hygiene and beauty schedule.</p>
+                    {% if grooming %}
+                        <p class="mb-1"><strong>Next:</strong> {{ grooming[-1].service }}</p>
+                        <p class="mb-3"><small>{{ grooming[-1].date }} at {{ grooming[-1].time }}</small></p>
+                    {% else %}
+                        <p class="text-muted small mb-3">No data available.</p>
+                    {% endif %}
+                    <a href="{{ url_for('grooming') }}" class="btn btn-sm btn-warning fw-bold" style="color: white; background-color: var(--secondary-color); border: none;">Manage</a>
+                </div>
+            </div>
+
+            <!-- Disease Prediction Quick Link -->
+            <div class="col-md-4">
+                <div class="p-4 rounded text-center h-100" style="background: rgba(220, 53, 69, 0.1); border: 2px solid #dc3545;">
+                    <div style="font-size: 3rem; margin-bottom: 10px;">🩺</div>
+                    <h4 class="fw-bold">Symptom Checker</h4>
+                    <p class="text-muted">Quickly analyze unusual behavior.</p>
+                    <p class="small text-muted mb-3">Identify potential issues early and seek professional help.</p>
+                    <a href="{{ url_for('disease_prediction') }}" class="btn btn-sm btn-danger">Start Analysis</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Chatbot Banner -->
+        <div class="mt-5 p-4 rounded text-white d-flex align-items-center justify-content-between" style="background: linear-gradient(135deg, #4a6cf7, #2f54eb); box-shadow: 0 10px 30px rgba(74, 108, 247, 0.3);">
+            <div>
+                <h4 class="fw-bold mb-1">Need Quick Advice?</h4>
+                <p class="mb-0 opacity-75">Our AI Dog Care Assistant is ready to help you with common questions.</p>
+            </div>
+            <a href="{{ url_for('chatbot') }}" class="btn btn-light fw-bold px-4">Chat Now</a>
+        </div>
+
+        <div class="text-center mt-4">
+            <a href="{{ url_for('services') }}" class="back-btn">⬅ Back to Services</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
