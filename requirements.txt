@@ -1,5 +1,5 @@
 Flask==2.3.2
-tensorflow-cpu
+tensorflow
 numpy<2.0.0
 Pillow
 openpyxl
