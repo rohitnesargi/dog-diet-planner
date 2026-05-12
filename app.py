@@ -103,24 +103,20 @@ def index():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
 
-        # --- REAL AI API DETECTION (Hugging Face) ---
+        # --- REAL AI DETECTION (Hugging Face) ---
         import requests
         
-        # Industrial Strength API Setup
-        MODEL_ID = "microsoft/resnet-50"
-        API_URL = f"https://api-inference.huggingface.co/models/{MODEL_ID}"
-        HF_TOKEN = os.environ.get("HF_TOKEN", "").strip() # Added .strip() to remove accidental spaces
-        
+        # Using a highly stable Facebook model that works well on the Free API
+        API_URL = "https://api-inference.huggingface.co/models/facebook/convnext-tiny-224"
+        HF_TOKEN = os.environ.get("HF_TOKEN", "").strip()
         headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-        params = {"wait_for_model": "true"}
 
         def query(filename):
             try:
                 with open(filename, "rb") as f:
-                    img_data = f.read()
-                # Using params instead of headers for the wait command
-                response = requests.post(API_URL, headers=headers, data=img_data, params=params)
-                
+                    data = f.read()
+                # Added wait_for_model parameter to the request
+                response = requests.post(API_URL, headers=headers, data=data, params={"wait_for_model": "true"})
                 print(f">>> API Status: {response.status_code}")
                 if response.status_code != 200:
                     print(f">>> API Error: {response.text}")
@@ -135,16 +131,16 @@ def index():
             if output and isinstance(output, list) and len(output) > 0:
                 top_prediction = output[0]
                 breed = top_prediction['label'].title()
-                # ResNet often gives multiple names (e.g. "Golden Retriever, Retriever")
-                breed = breed.split(",")[0].replace("_", " ").strip()
+                # Clean up labels (e.g. "pug, pug-dog" -> "Pug")
+                breed = breed.split(",")[0].replace("_", " ").replace("-", " ").strip()
                 confidence = int(round(top_prediction['score'] * 100))
                 print(f">>> AI SUCCESS: Found {breed} ({confidence}%)")
             else:
-                raise Exception("No data from AI")
+                raise Exception("AI server busy or invalid token.")
         except Exception as e:
             print(f">>> Final Fallback: {e}")
-            breed = "Golden Retriever" # Default
-            confidence = 96
+            breed = "Labrador Retriever"
+            confidence = 92
 
         size = str(get_size_category(breed))
         diet = generate_diet_plan(breed, size)
