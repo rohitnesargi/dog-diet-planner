@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, send_file
+from werkzeug.utils import secure_filename
 import os
 import numpy as np
 from PIL import Image
@@ -120,7 +121,7 @@ def check_user(email, password):
 
 def predict_breed(img_path):
 
-    img = Image.open(img_path).resize((224, 224))
+    img = Image.open(img_path).convert('RGB').resize((224, 224))
 
     img_array = np.array(img)
 
@@ -249,13 +250,8 @@ def index():
 
         file = request.files['image']
 
-        if file.filename == '':
-            return render_template('index.html',
-                                   user=session['user'],
-                                   message="Select image")
-
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'],
-                                file.filename)
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
 
         file.save(filepath)
 
@@ -276,9 +272,13 @@ def index():
         session['exact_size'] = exact_size
         session['diet'] = dict(diet)
 
+        # Pass the relative path for use with url_for in the template
+        # 'static/uploads/filename' -> 'uploads/filename'
+        relative_image_path = os.path.join('uploads', filename).replace('\\', '/')
+
         return render_template(
             'result.html',
-            image=filepath,
+            image=relative_image_path,
             breed=breed,
             confidence=confidence,
             diet=diet,

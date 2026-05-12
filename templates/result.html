@@ -8,7 +8,7 @@
 <!-- Premium Background -->
 <div class="result-bg"></div>
 
-<div class="container py-5 position-relative" style="z-index: 10; font-family: 'Poppins', sans-serif;">
+<div class="position-relative" style="z-index: 10; font-family: 'Poppins', sans-serif;">
     <!-- Animated Header -->
     <div class="text-center mb-5 fade-in-up">
         <h1 class="fw-bold text-white mb-2" style="font-size: 2.8rem; text-shadow: 0 4px 15px rgba(0,0,0,0.3);">Analysis Complete</h1>
@@ -24,7 +24,7 @@
                     <!-- Left Column: Image -->
                     <div class="col-lg-5 p-4 d-flex flex-column align-items-center justify-content-center image-column">
                         <div class="image-wrapper shadow">
-                            <img src="/{{ image }}" class="img-fluid dog-img" alt="Analyzed Dog Image">
+                            <img src="{{ url_for('static', filename=image) }}" class="img-fluid dog-img" alt="Analyzed Dog Image">
                         </div>
                         <div class="match-badge mt-4 shadow-sm">
                             <i class="fa-solid fa-check-circle text-success me-2"></i> {{ confidence }}% Accuracy
@@ -131,7 +131,7 @@
         left: 0;
         width: 100%;
         height: 100%;
-        background: linear-gradient(135deg, rgba(15, 23, 42, 0.85), rgba(30, 41, 59, 0.75)), url('/static/images/n.jpg') no-repeat center center;
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.85), rgba(30, 41, 59, 0.75)), url('/static/images/n.jpg.jpeg') no-repeat center center;
         background-size: cover;
         z-index: 0;
     }
