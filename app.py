@@ -4,10 +4,8 @@ import os
 import numpy as np
 from PIL import Image
 import datetime
-# TensorFlow imports moved to get_model for lazy loading
 import openpyxl
 from diet_data import generate_diet_plan, get_size_category, get_exact_size
-import datetime
 
 app = Flask(__name__)
 app.secret_key = "secretkey"
@@ -125,24 +123,20 @@ def check_user(email, password):
 # ======================================================
 
 def predict_breed(img_path):
-
+    # Deep Lazy Load all TF components
+    import tensorflow as tf
     from tensorflow.keras.applications.mobilenet_v2 import preprocess_input, decode_predictions
     
     img = Image.open(img_path).convert('RGB').resize((224, 224))
-
     img_array = np.array(img)
-
     img_array = preprocess_input(img_array)
-
     img_array = np.expand_dims(img_array, axis=0)
 
     model_instance = get_model()
     predictions = model_instance.predict(img_array)
-
     decoded = decode_predictions(predictions, top=1)[0][0]
 
     breed = str(decoded[1])
-
     confidence = int(round(decoded[2] * 100))
 
     return breed, confidence
@@ -169,9 +163,7 @@ def home():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-
     if request.method == 'POST':
-
         username = request.form.get('username', '').strip()
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
@@ -186,11 +178,9 @@ def register():
         success = register_user(username, email, password)
 
         if not success:
-            return render_template('register.html',
-                                   message="Email already exists!")
+            return render_template('register.html', message="Email already exists!")
 
-        return render_template('login.html',
-                               message="Registration Successful! Please Login")
+        return render_template('login.html', message="Registration Successful! Please Login")
 
     return render_template('register.html')
 
@@ -200,18 +190,14 @@ def register():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-
     if request.method == 'POST':
-
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
 
         if not email:
-            return render_template('login.html',
-                                   message="Email is required!")
+            return render_template('login.html', message="Email is required!")
         if not password:
-            return render_template('login.html',
-                                   message="Password is required!")
+            return render_template('login.html', message="Password is required!")
 
         # Admin Login
         if email == ADMIN_EMAIL and password == ADMIN_PASSWORD:
@@ -225,8 +211,7 @@ def login():
             session['user'] = user
             return redirect(url_for('index'))
 
-        return render_template('login.html',
-                               message="Invalid Credentials")
+        return render_template('login.html', message="Invalid Credentials")
 
     return render_template('login.html')
 
@@ -245,33 +230,25 @@ def logout():
 
 @app.route('/index', methods=['GET', 'POST'])
 def index():
-
     if 'user' not in session:
         return redirect(url_for('login'))
 
     if request.method == 'POST':
-
         if 'image' not in request.files:
-            return render_template('index.html',
-                                   user=session['user'],
-                                   message="Upload image")
+            return render_template('index.html', user=session['user'], message="Upload image")
 
         file = request.files['image']
-
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-
         file.save(filepath)
 
         breed, confidence = predict_breed(filepath)
 
         size = str(get_size_category(breed))
         exact_size = get_exact_size(breed, size)
-
         diet = generate_diet_plan(breed, size)
 
         youtube_link = f"https://www.youtube.com/results?search_query={breed}+dog+training"
-
         amazon_link = "https://www.amazon.in/s?k=" + diet['food'].replace(" ", "+")
 
         session['breed'] = str(breed)
@@ -280,8 +257,6 @@ def index():
         session['exact_size'] = exact_size
         session['diet'] = dict(diet)
 
-        # Pass the relative path for use with url_for in the template
-        # 'static/uploads/filename' -> 'uploads/filename'
         relative_image_path = os.path.join('uploads', filename).replace('\\', '/')
 
         return render_template(
@@ -305,7 +280,6 @@ def index():
 
 @app.route('/download_report')
 def download_report():
-
     if 'user' not in session:
         return redirect(url_for('login'))
 
@@ -325,34 +299,11 @@ Extras: {session['diet']['extras']}
 Generated:
 {datetime.datetime.now()}
 """
-
     file_path = "dog_report.txt"
-
     with open(file_path, "w") as file:
         file.write(report)
 
     return send_file(file_path, as_attachment=True)
-
-# ======================================================
-# ADMIN LOGIN
-# ======================================================
-
-@app.route('/admin_login', methods=['GET', 'POST'])
-def admin_login():
-
-    if request.method == 'POST':
-
-        email = request.form.get('email')
-        password = request.form.get('password')
-
-        if email == ADMIN_EMAIL and password == ADMIN_PASSWORD:
-            session['admin'] = True
-            return redirect(url_for('admin_dashboard'))
-
-        return render_template("admin_login.html",
-                               message="Invalid Admin Credentials")
-
-    return render_template("admin_login.html")
 
 # ======================================================
 # ADMIN DASHBOARD
@@ -360,13 +311,11 @@ def admin_login():
 
 @app.route('/admin')
 def admin_dashboard():
-
     if 'admin' not in session:
         return redirect(url_for('admin_login'))
 
     wb = openpyxl.load_workbook(EXCEL_FILE)
     sheet = wb.active
-
     users = []
 
     for i, row in enumerate(sheet.iter_rows(min_row=2, values_only=True)):
@@ -379,42 +328,39 @@ def admin_dashboard():
 
     return render_template("admin.html", users=users)
 
-# ======================================================
-# DELETE USER
-# ======================================================
+@app.route('/admin_login', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+
+        if email == ADMIN_EMAIL and password == ADMIN_PASSWORD:
+            session['admin'] = True
+            return redirect(url_for('admin_dashboard'))
+
+        return render_template("admin_login.html", message="Invalid Admin Credentials")
+
+    return render_template("admin_login.html")
 
 @app.route('/delete_user/<int:user_id>')
 def delete_user(user_id):
-
     wb = openpyxl.load_workbook(EXCEL_FILE)
     sheet = wb.active
-
     sheet.delete_rows(user_id + 2)
-
     wb.save(EXCEL_FILE)
-
     return redirect(url_for('admin_dashboard'))
-
-# ======================================================
-# EDIT USER
-# ======================================================
 
 @app.route('/edit_user/<int:user_id>', methods=['GET', 'POST'])
 def edit_user(user_id):
-
     wb = openpyxl.load_workbook(EXCEL_FILE)
     sheet = wb.active
-
     row_no = user_id + 2
 
     if request.method == 'POST':
-
         sheet.cell(row=row_no, column=1).value = request.form['username']
         sheet.cell(row=row_no, column=2).value = request.form['email']
         sheet.cell(row=row_no, column=3).value = request.form['password']
-
         wb.save(EXCEL_FILE)
-
         return redirect(url_for('admin_dashboard'))
 
     user = {
@@ -422,12 +368,7 @@ def edit_user(user_id):
         "email": sheet.cell(row=row_no, column=2).value,
         "password": sheet.cell(row=row_no, column=3).value
     }
-
     return render_template("edit_user.html", user=user)
-
-# ======================================================
-# ADMIN LOGOUT
-# ======================================================
 
 @app.route('/admin_logout')
 def admin_logout():
@@ -440,32 +381,27 @@ def admin_logout():
 
 @app.route('/about')
 def about():
-    if 'user' not in session:
-        return redirect(url_for('login'))
+    if 'user' not in session: return redirect(url_for('login'))
     return render_template('about.html', user=session['user'])
 
 @app.route('/services')
 def services():
-    if 'user' not in session:
-        return redirect(url_for('login'))
+    if 'user' not in session: return redirect(url_for('login'))
     return render_template('services.html', user=session['user'])
 
 @app.route('/vets')
 def vets():
-    if 'user' not in session:
-        return redirect(url_for('login'))
+    if 'user' not in session: return redirect(url_for('login'))
     return render_template('vets.html', user=session['user'])
 
 @app.route('/profile')
 def profile():
-    if 'user' not in session:
-        return redirect(url_for('login'))
+    if 'user' not in session: return redirect(url_for('login'))
     return render_template('profile.html', user=session['user'])
 
 @app.route('/contact', methods=['GET', 'POST'])
 def contact():
-    if 'user' not in session:
-        return redirect(url_for('login'))
+    if 'user' not in session: return redirect(url_for('login'))
     if request.method == 'POST':
         return render_template('contact.html', user=session['user'], message="Message sent successfully!")
     return render_template('contact.html', user=session['user'])
@@ -474,159 +410,89 @@ def contact():
 # NEW MODULES
 # ======================================================
 
-# DISEASE PREDICTION
 @app.route('/disease_prediction', methods=['GET', 'POST'])
 def disease_prediction():
-    if 'user' not in session:
-        return redirect(url_for('login'))
-    
+    if 'user' not in session: return redirect(url_for('login'))
     result = None
     if request.method == 'POST':
         symptoms = request.form.getlist('symptoms')
-        
-        # Simple Logic
         if set(['coughing', 'lethargy']).issubset(set(symptoms)):
-            result = {"disease": "Kennel Cough", "advice": "Consult a vet for antibiotics and keep your dog isolated."}
+            result = {"disease": "Kennel Cough", "advice": "Consult a vet for antibiotics."}
         elif set(['vomiting', 'diarrhea', 'lethargy']).issubset(set(symptoms)):
-            result = {"disease": "Parvovirus", "advice": "URGENT: This is life-threatening. Visit an emergency vet immediately."}
+            result = {"disease": "Parvovirus", "advice": "URGENT: Visit an emergency vet."}
         elif set(['fever', 'sneezing', 'coughing']).issubset(set(symptoms)):
-            result = {"disease": "Distemper", "advice": "Consult a vet. This is a serious viral disease."}
+            result = {"disease": "Distemper", "advice": "Consult a vet."}
         elif 'itching' in symptoms:
-            result = {"disease": "Allergies", "advice": "Check for skin parasites or change in diet. Consult a vet for antihistamines."}
+            result = {"disease": "Allergies", "advice": "Consult a vet for antihistamines."}
         elif symptoms:
-            result = {"disease": "General Infection/Malaise", "advice": "Your dog seems unwell. Rest and monitor, but consult a vet if symptoms persist."}
+            result = {"disease": "General Infection", "advice": "Consult a vet if symptoms persist."}
         else:
-            result = {"disease": "Unknown", "advice": "Please select some symptoms for a better analysis."}
-
+            result = {"disease": "Unknown", "advice": "Select some symptoms."}
     return render_template('disease_prediction.html', user=session['user'], result=result)
 
-# VACCINATION REMINDER
 @app.route('/vaccination', methods=['GET', 'POST'])
 def vaccination():
-    if 'user' not in session:
-        return redirect(url_for('login'))
-    
+    if 'user' not in session: return redirect(url_for('login'))
     user_email = ""
-    # Get user email from session/excel (need to store email in session for easier access)
-    # Re-checking user email from users.xlsx based on session['user']
-    wb_u = openpyxl.load_workbook(EXCEL_FILE)
-    sh_u = wb_u.active
+    wb_u = openpyxl.load_workbook(EXCEL_FILE); sh_u = wb_u.active
     for row in sh_u.iter_rows(min_row=2, values_only=True):
-        if row[0] == session['user']:
-            user_email = row[1]
-            break
-
+        if row[0] == session['user']: user_email = row[1]; break
     if request.method == 'POST':
-        pet_name = request.form.get('pet_name')
-        vaccine = request.form.get('vaccine')
-        date = request.form.get('date')
-        
-        wb = openpyxl.load_workbook(HEALTH_FILE)
-        sheet = wb["Vaccinations"]
-        sheet.append([user_email, pet_name, vaccine, date, "Scheduled"])
-        wb.save(HEALTH_FILE)
+        pet_name = request.form.get('pet_name'); vaccine = request.form.get('vaccine'); date = request.form.get('date')
+        wb = openpyxl.load_workbook(HEALTH_FILE); sheet = wb["Vaccinations"]
+        sheet.append([user_email, pet_name, vaccine, date, "Scheduled"]); wb.save(HEALTH_FILE)
         return redirect(url_for('vaccination'))
-
-    # Load vaccinations
     vaccinations = []
-    wb = openpyxl.load_workbook(HEALTH_FILE)
-    sheet = wb["Vaccinations"]
+    wb = openpyxl.load_workbook(HEALTH_FILE); sheet = wb["Vaccinations"]
     for row in sheet.iter_rows(min_row=2, values_only=True):
-        if row[0] == user_email:
-            vaccinations.append({"pet": row[1], "vaccine": row[2], "date": row[3], "status": row[4]})
-
+        if row[0] == user_email: vaccinations.append({"pet": row[1], "vaccine": row[2], "date": row[3], "status": row[4]})
     return render_template('vaccination.html', user=session['user'], vaccinations=vaccinations)
 
-# GROOMING SCHEDULER
 @app.route('/grooming', methods=['GET', 'POST'])
 def grooming():
-    if 'user' not in session:
-        return redirect(url_for('login'))
-
+    if 'user' not in session: return redirect(url_for('login'))
     user_email = ""
-    wb_u = openpyxl.load_workbook(EXCEL_FILE)
-    sh_u = wb_u.active
+    wb_u = openpyxl.load_workbook(EXCEL_FILE); sh_u = wb_u.active
     for row in sh_u.iter_rows(min_row=2, values_only=True):
-        if row[0] == session['user']:
-            user_email = row[1]
-            break
-
+        if row[0] == session['user']: user_email = row[1]; break
     if request.method == 'POST':
-        pet_name = request.form.get('pet_name')
-        service = request.form.get('service')
-        date = request.form.get('date')
-        time = request.form.get('time')
-        
-        wb = openpyxl.load_workbook(HEALTH_FILE)
-        sheet = wb["Grooming"]
-        sheet.append([user_email, pet_name, service, date, time])
-        wb.save(HEALTH_FILE)
+        pet_name = request.form.get('pet_name'); service = request.form.get('service'); date = request.form.get('date'); time = request.form.get('time')
+        wb = openpyxl.load_workbook(HEALTH_FILE); sheet = wb["Grooming"]
+        sheet.append([user_email, pet_name, service, date, time]); wb.save(HEALTH_FILE)
         return redirect(url_for('grooming'))
-
     grooming_sessions = []
-    wb = openpyxl.load_workbook(HEALTH_FILE)
-    sheet = wb["Grooming"]
+    wb = openpyxl.load_workbook(HEALTH_FILE); sheet = wb["Grooming"]
     for row in sheet.iter_rows(min_row=2, values_only=True):
-        if row[0] == user_email:
-            grooming_sessions.append({"pet": row[1], "service": row[2], "date": row[3], "time": row[4]})
-
+        if row[0] == user_email: grooming_sessions.append({"pet": row[1], "service": row[2], "date": row[3], "time": row[4]})
     return render_template('grooming.html', user=session['user'], sessions=grooming_sessions)
 
-# HEALTH DASHBOARD
 @app.route('/health_dashboard')
 def health_dashboard():
-    if 'user' not in session:
-        return redirect(url_for('login'))
-
+    if 'user' not in session: return redirect(url_for('login'))
     user_email = ""
-    wb_u = openpyxl.load_workbook(EXCEL_FILE)
-    sh_u = wb_u.active
+    wb_u = openpyxl.load_workbook(EXCEL_FILE); sh_u = wb_u.active
     for row in sh_u.iter_rows(min_row=2, values_only=True):
-        if row[0] == session['user']:
-            user_email = row[1]
-            break
-
+        if row[0] == session['user']: user_email = row[1]; break
     wb = openpyxl.load_workbook(HEALTH_FILE)
-    
-    # Latest Vaccine
     vaccines = []
     for row in wb["Vaccinations"].iter_rows(min_row=2, values_only=True):
-        if row[0] == user_email:
-            vaccines.append({"pet": row[1], "vaccine": row[2], "date": row[3]})
-    
-    # Latest Grooming
+        if row[0] == user_email: vaccines.append({"pet": row[1], "vaccine": row[2], "date": row[3]})
     grooming = []
     for row in wb["Grooming"].iter_rows(min_row=2, values_only=True):
-        if row[0] == user_email:
-            grooming.append({"pet": row[1], "service": row[2], "date": row[3]})
-
+        if row[0] == user_email: grooming.append({"pet": row[1], "service": row[2], "date": row[3]})
     return render_template('health_dashboard.html', user=session['user'], vaccines=vaccines, grooming=grooming)
 
-# AI CHATBOT
 @app.route('/chatbot', methods=['GET', 'POST'])
 def chatbot():
-    if 'user' not in session:
-        return redirect(url_for('login'))
-    
+    if 'user' not in session: return redirect(url_for('login'))
     if request.method == 'POST':
         user_msg = request.json.get('message', '').lower()
-        
-        response = "I'm sorry, I don't understand that. You can ask me about diet, symptoms, or grooming!"
-        
-        if 'diet' in user_msg or 'food' in user_msg:
-            response = "For a healthy diet, ensure your dog gets balanced proteins and vitamins. You can use our Diet Planner for specific breed recommendations!"
-        elif 'fever' in user_msg or 'sick' in user_msg or 'symptoms' in user_msg:
-            response = "If your dog is showing symptoms like fever or lethargy, please use our Disease Prediction tool or consult a vet immediately."
-        elif 'groom' in user_msg or 'bath' in user_msg:
-            response = "Regular grooming is essential for a healthy coat. You can schedule a session in our Grooming Scheduler!"
-        elif 'hi' in user_msg or 'hello' in user_msg:
-            response = "Hello! I'm your AI Dog Care Assistant. How can I help you today?"
-            
+        response = "I'm sorry, I don't understand that. Ask me about diet or symptoms!"
+        if 'diet' in user_msg or 'food' in user_msg: response = "Ensure your dog gets balanced proteins!"
+        elif 'sick' in user_msg or 'symptoms' in user_msg: response = "Consult a vet or use our Symptom Checker."
+        elif 'hi' in user_msg or 'hello' in user_msg: response = "Hello! How can I help you today?"
         return {"response": response}
-
     return render_template('chatbot.html', user=session['user'])
-
-# ======================================================
 
 if __name__ == '__main__':
     app.run(debug=True)
