@@ -1,22 +1,31 @@
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 import datetime
-import threading
+import gc
 
 # Global variables
-app_instance = None
 model = None
-model_ready = False
 
-def load_model_background():
-    global model, model_ready
-    try:
-        print(">>> BACKGROUND: Starting AI Model Load...")
-        import tensorflow as tf
-        model = tf.keras.applications.MobileNetV2(weights='imagenet')
-        model_ready = True
-        print(">>> BACKGROUND: AI Model Loaded and Ready!")
-    except Exception as e:
-        print(f">>> BACKGROUND ERROR: {e}")
+def get_model():
+    """Lazy-load the model only when needed."""
+    global model
+    if model is None:
+        try:
+            print(">>> AI: Loading TensorFlow for the first time...")
+            import tensorflow as tf
+            
+            # Memory optimization: Limit TensorFlow threads to save RAM
+            tf.config.threading.set_intra_op_parallelism_threads(1)
+            tf.config.threading.set_inter_op_parallelism_threads(1)
+            
+            # Load the model
+            model = tf.keras.applications.MobileNetV2(weights='imagenet')
+            print(">>> AI: Model loaded successfully!")
+            gc.collect()
+        except Exception as e:
+            print(f">>> AI ERROR: Failed to load model: {e}")
+            return None
+    return model
 
 def get_app():
     from flask import Flask, render_template, request, redirect, url_for, session, send_file
@@ -46,11 +55,6 @@ def get_app():
         ws1 = wb.active; ws1.title = "Vaccinations"; ws1.append(["UserEmail", "PetName", "Vaccine", "Date", "Status"])
         ws2 = wb.create_sheet("Grooming"); ws2.append(["UserEmail", "PetName", "Service", "Date", "Time"])
         wb.save(HEALTH_FILE)
-
-    # START THE BACKGROUND LOAD
-    thread = threading.Thread(target=load_model_background)
-    thread.daemon = True
-    thread.start()
 
     return app, EXCEL_FILE, HEALTH_FILE, ADMIN_EMAIL, ADMIN_PASSWORD
 
@@ -114,15 +118,10 @@ def index():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
 
-        # WAIT FOR MODEL TO BE READY (if it's still loading)
-        global model, model_ready
-        if not model_ready:
-            print(">>> PREDICTION: Waiting for model to finish loading...")
-            # If it's not ready, we have to import it now (fallback)
-            import tensorflow as tf
-            if model is None:
-                model = tf.keras.applications.MobileNetV2(weights='imagenet')
-                model_ready = True
+        # GET THE MODEL (Lazy Loaded)
+        current_model = get_model()
+        if current_model is None:
+            return render_template('index.html', user=session['user'], message="AI Server busy. Try again.")
 
         from tensorflow.keras.applications.mobilenet_v2 import preprocess_input, decode_predictions
         img = Image.open(filepath).convert('RGB').resize((224, 224))
@@ -130,7 +129,7 @@ def index():
         img_array = preprocess_input(img_array)
         img_array = np.expand_dims(img_array, axis=0)
 
-        predictions = model.predict(img_array)
+        predictions = current_model.predict(img_array)
         decoded = decode_predictions(predictions, top=1)[0][0]
 
         breed = str(decoded[1])
@@ -141,11 +140,17 @@ def index():
         session.update({'breed': breed, 'confidence': confidence, 'size': size, 'diet': diet})
         relative_path = os.path.join('uploads', filename).replace('\\', '/')
 
+        # Clean up memory after heavy prediction
+        gc.collect()
+        
+        # Free up TensorFlow memory explicitly if possible
+        # (Though with lazy loading it stays in memory once loaded)
+
         return render_template('result.html', image=relative_path, breed=breed, confidence=confidence, 
-                               diet=diet, size=size, exact_size=get_exact_size(breed, size),
-                               youtube_link=f"https://www.youtube.com/results?search_query={breed}+training",
-                               amazon_link="https://www.amazon.in/s?k=" + diet['food'].replace(" ", "+"),
-                               user=session['user'])
+                                diet=diet, size=size, exact_size=get_exact_size(breed, size),
+                                youtube_link=f"https://www.youtube.com/results?search_query={breed}+training",
+                                amazon_link="https://www.amazon.in/s?k=" + diet['food'].replace(" ", "+"),
+                                user=session['user'])
     return render_template('index.html', user=session['user'])
 
 @app.route('/health')
