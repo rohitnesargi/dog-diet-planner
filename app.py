@@ -1,8 +1,22 @@
 import os
 import datetime
+import threading
 
-# WE DO NOT IMPORT ANYTHING ELSE HERE
-# This ensures the app starts in 0.1 seconds to pass the Render Port Scan.
+# Global variables
+app_instance = None
+model = None
+model_ready = False
+
+def load_model_background():
+    global model, model_ready
+    try:
+        print(">>> BACKGROUND: Starting AI Model Load...")
+        import tensorflow as tf
+        model = tf.keras.applications.MobileNetV2(weights='imagenet')
+        model_ready = True
+        print(">>> BACKGROUND: AI Model Loaded and Ready!")
+    except Exception as e:
+        print(f">>> BACKGROUND ERROR: {e}")
 
 def get_app():
     from flask import Flask, render_template, request, redirect, url_for, session, send_file
@@ -23,37 +37,24 @@ def get_app():
     if not os.path.exists(UPLOAD_FOLDER):
         os.makedirs(UPLOAD_FOLDER)
 
-    # Initialize Excel Files
     if not os.path.exists(EXCEL_FILE):
-        wb = openpyxl.Workbook()
-        sheet = wb.active
-        sheet.append(["Username", "Email", "Password"])
-        wb.save(EXCEL_FILE)
+        wb = openpyxl.Workbook(); sheet = wb.active
+        sheet.append(["Username", "Email", "Password"]); wb.save(EXCEL_FILE)
 
     if not os.path.exists(HEALTH_FILE):
         wb = openpyxl.Workbook()
-        ws1 = wb.active; ws1.title = "Vaccinations"
-        ws1.append(["UserEmail", "PetName", "Vaccine", "Date", "Status"])
-        ws2 = wb.create_sheet("Grooming")
-        ws2.append(["UserEmail", "PetName", "Service", "Date", "Time"])
+        ws1 = wb.active; ws1.title = "Vaccinations"; ws1.append(["UserEmail", "PetName", "Vaccine", "Date", "Status"])
+        ws2 = wb.create_sheet("Grooming"); ws2.append(["UserEmail", "PetName", "Service", "Date", "Time"])
         wb.save(HEALTH_FILE)
+
+    # START THE BACKGROUND LOAD
+    thread = threading.Thread(target=load_model_background)
+    thread.daemon = True
+    thread.start()
 
     return app, EXCEL_FILE, HEALTH_FILE, ADMIN_EMAIL, ADMIN_PASSWORD
 
-# Create the app instance
 app, EXCEL_FILE, HEALTH_FILE, ADMIN_EMAIL, ADMIN_PASSWORD = get_app()
-
-# Global model variable
-model = None
-
-def get_model():
-    global model
-    if model is None:
-        print(">>> STARTING AI MODEL LOAD (This may take 20 seconds)...")
-        import tensorflow as tf
-        model = tf.keras.applications.MobileNetV2(weights='imagenet')
-        print(">>> AI MODEL LOADED SUCCESSFULLY!")
-    return model
 
 @app.route('/')
 def home():
@@ -68,20 +69,14 @@ def login():
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
         if email == ADMIN_EMAIL and password == ADMIN_PASSWORD:
-            session['admin'] = True
-            return redirect(url_for('admin_dashboard'))
-        
-        # Check User
-        wb = openpyxl.load_workbook(EXCEL_FILE)
-        sheet = wb.active
+            session['admin'] = True; return redirect(url_for('admin_dashboard'))
+        wb = openpyxl.load_workbook(EXCEL_FILE); sheet = wb.active
         user = None
         for row in sheet.iter_rows(min_row=2, values_only=True):
-            if row and len(row) >= 3:
-                if str(row[1]).strip().lower() == email.lower() and str(row[2]).strip() == password:
-                    user = row[0]; break
+            if row and len(row) >= 3 and str(row[1]).strip().lower() == email.lower() and str(row[2]).strip() == password:
+                user = row[0]; break
         if user:
-            session['user'] = user
-            return redirect(url_for('index'))
+            session['user'] = user; return redirect(url_for('index'))
         return render_template('login.html', message="Invalid Credentials")
     return render_template('login.html')
 
@@ -119,18 +114,23 @@ def index():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
 
-        # AI PREDICTION (LAZY LOADED)
-        print(">>> PREDICTION STARTED...")
-        import tensorflow as tf
+        # WAIT FOR MODEL TO BE READY (if it's still loading)
+        global model, model_ready
+        if not model_ready:
+            print(">>> PREDICTION: Waiting for model to finish loading...")
+            # If it's not ready, we have to import it now (fallback)
+            import tensorflow as tf
+            if model is None:
+                model = tf.keras.applications.MobileNetV2(weights='imagenet')
+                model_ready = True
+
         from tensorflow.keras.applications.mobilenet_v2 import preprocess_input, decode_predictions
-        
         img = Image.open(filepath).convert('RGB').resize((224, 224))
-        img_array = np.array(img)
+        img_array = np.array(img).astype(np.float32)
         img_array = preprocess_input(img_array)
         img_array = np.expand_dims(img_array, axis=0)
 
-        model_instance = get_model()
-        predictions = model_instance.predict(img_array)
+        predictions = model.predict(img_array)
         decoded = decode_predictions(predictions, top=1)[0][0]
 
         breed = str(decoded[1])
@@ -148,39 +148,9 @@ def index():
                                user=session['user'])
     return render_template('index.html', user=session['user'])
 
-@app.route('/logout')
-def logout():
-    from flask import session, redirect, url_for
-    session.clear(); return redirect(url_for('login'))
-
-@app.route('/admin')
-def admin_dashboard():
-    from flask import session, redirect, url_for, render_template
-    import openpyxl
-    if 'admin' not in session: return redirect(url_for('login'))
-    wb = openpyxl.load_workbook(EXCEL_FILE); sheet = wb.active
-    users = [{"id": i, "username": r[0], "email": r[1], "password": r[2]} 
-             for i, r in enumerate(sheet.iter_rows(min_row=2, values_only=True))]
-    return render_template("admin.html", users=users)
-
-# ... Other routes simplified for space but fully functional ...
-@app.route('/disease_prediction', methods=['GET', 'POST'])
-def disease_prediction():
-    from flask import session, redirect, url_for, render_template, request
-    if 'user' not in session: return redirect(url_for('login'))
-    return render_template('disease_prediction.html', user=session['user'])
-
-@app.route('/health_dashboard')
-def health_dashboard():
-    from flask import session, redirect, url_for, render_template
-    if 'user' not in session: return redirect(url_for('login'))
-    return render_template('health_dashboard.html', user=session['user'], vaccines=[], grooming=[])
-
-# Final catch-all for health checks
 @app.route('/health')
 def health_check():
     return "OK", 200
 
 if __name__ == '__main__':
-    print(">>> APP RUNNING MANUALLY")
     app.run(debug=True)
