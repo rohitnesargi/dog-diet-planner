@@ -3,8 +3,8 @@ from werkzeug.utils import secure_filename
 import os
 import numpy as np
 from PIL import Image
-import tensorflow as tf
-from tensorflow.keras.applications.mobilenet_v2 import preprocess_input, decode_predictions
+import datetime
+# TensorFlow imports moved to get_model for lazy loading
 import openpyxl
 from diet_data import generate_diet_plan, get_size_category, get_exact_size
 import datetime
@@ -64,6 +64,7 @@ def get_model():
     global model
     if model is None:
         print("Loading AI Model... This may take a moment.")
+        import tensorflow as tf
         model = tf.keras.applications.MobileNetV2(weights='imagenet')
     return model
 
@@ -125,6 +126,8 @@ def check_user(email, password):
 
 def predict_breed(img_path):
 
+    from tensorflow.keras.applications.mobilenet_v2 import preprocess_input, decode_predictions
+    
     img = Image.open(img_path).convert('RGB').resize((224, 224))
 
     img_array = np.array(img)
