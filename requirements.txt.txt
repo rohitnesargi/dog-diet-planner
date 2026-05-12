@@ -1,6 +1,0 @@
-Flask==2.3.2
-tensorflow-cpu
-numpy
-Pillow
-openpyxl
-Werkzeug

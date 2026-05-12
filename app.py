@@ -8,16 +8,23 @@ import openpyxl
 model = None
 
 def get_model():
-    """Lazy-load the model only when needed."""
+    """Lazy-load the model only when needed with aggressive memory saving."""
     global model
     if model is None:
         try:
-            print(">>> AI: Loading TensorFlow for the first time...")
+            print(">>> AI: Loading TensorFlow with ULTRA-LIGHT config...")
             import tensorflow as tf
             
-            # Memory optimization: Limit TensorFlow threads to save RAM
+            # AGGRESSIVE MEMORY FIXES:
+            # 1. Disable GPU (even if one is found)
+            tf.config.set_visible_devices([], 'GPU')
+            
+            # 2. Force CPU to use only 1 thread to save RAM
             tf.config.threading.set_intra_op_parallelism_threads(1)
             tf.config.threading.set_inter_op_parallelism_threads(1)
+            
+            # 3. Clear any existing backend sessions
+            tf.keras.backend.clear_session()
             
             # Load the model
             model = tf.keras.applications.MobileNetV2(weights='imagenet')
