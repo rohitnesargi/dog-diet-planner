@@ -7,3 +7,4 @@ Werkzeug==2.3.6
 requests
 rich
 six
+huggingface_hub

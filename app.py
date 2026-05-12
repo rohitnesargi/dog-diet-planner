@@ -104,72 +104,52 @@ def index():
         file.save(filepath)
 
         # --- REAL AI DETECTION (Hugging Face) ---
-        import requests
+        from huggingface_hub import InferenceClient
         
-        # PRIMARY MODEL: Google ViT (Highly stable for general classification)
-        API_URL = "https://api-inference.huggingface.co/models/google/vit-base-patch16-224"
-        # SECONDARY MODEL: Specialized Dog Breed Classifier (Fallback)
-        FALLBACK_API_URL = "https://api-inference.huggingface.co/models/valentinocc/dog-breed-classifier"
-        
+        # Use InferenceClient which is more robust than manual requests
         HF_TOKEN = os.environ.get("HF_TOKEN", "").strip()
-        headers = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
-
-        def query(filename, url):
+        client = InferenceClient(token=HF_TOKEN if HF_TOKEN else None)
+        
+        # PRIMARY MODEL: Specialized Dog Breed Classifier (High Accuracy)
+        MODEL_ID = "nateraw/vit-base-patch16-224-dog-breed"
+        # FALLBACK: General reliable model
+        FALLBACK_MODEL_ID = "google/vit-base-patch16-224"
+        
+        def run_inference(model_id, filepath):
             try:
-                with open(filename, "rb") as f:
-                    data = f.read()
-                response = requests.post(url, headers=headers, data=data, params={"wait_for_model": "true"}, timeout=20)
-                print(f">>> API Request to {url.split('/')[-1]} - Status: {response.status_code}")
-                
-                if response.status_code == 200:
-                    return response.json()
-                elif response.status_code == 503: # Model loading
-                    print(">>> API Info: Model is loading, retrying once...")
-                    import time
-                    time.sleep(5)
-                    response = requests.post(url, headers=headers, data=data, params={"wait_for_model": "true"}, timeout=20)
-                    if response.status_code == 200: return response.json()
-                
-                print(f">>> API Error Output: {response.text[:200]}")
+                print(f">>> Attempting AI Detection with {model_id}...")
+                # InferenceClient handles binary data and wait_for_model automatically
+                result = client.image_classification(filepath, model=model_id)
+                if result and isinstance(result, list) and len(result) > 0:
+                    return result
                 return None
             except Exception as e:
-                print(f">>> Request Error: {e}")
-            return None
+                print(f">>> Inference Error ({model_id}): {e}")
+                return None
 
         breed = "Labrador Retriever"
         confidence = 92
 
         try:
-            # Try Primary Model
-            output = query(filepath, API_URL)
+            # Try Specialized Model First
+            output = run_inference(MODEL_ID, filepath)
             
-            # If primary fails or isn't a dog, try fallback specialized model
-            is_dog_related = False
-            if output and isinstance(output, list) and len(output) > 0:
-                top_label = output[0].get('label', '').lower()
-                # Simple check if the ImageNet label is dog-related
-                dog_keywords = ['dog', 'terrier', 'retriever', 'hound', 'spaniel', 'shepherd', 'collie', 'pug', 'beagle']
-                if any(k in top_label for k in dog_keywords):
-                    is_dog_related = True
+            # If that fails, try General Model
+            if not output:
+                print(">>> Specialized model failed, trying general model...")
+                output = run_inference(FALLBACK_MODEL_ID, filepath)
 
-            if not is_dog_related:
-                print(">>> Primary model results not clearly a dog, trying specialized model...")
-                fallback_output = query(filepath, FALLBACK_API_URL)
-                if fallback_output:
-                    output = fallback_output
-
-            if output and isinstance(output, list) and len(output) > 0:
+            if output:
                 top_prediction = output[0]
                 raw_breed = top_prediction['label'].title()
-                # Clean up labels (e.g. "pug, pug-dog" -> "Pug")
+                # Clean up labels
                 breed = raw_breed.split(",")[0].replace("_", " ").replace("-", " ").strip()
                 confidence = int(round(top_prediction['score'] * 100))
                 print(f">>> AI SUCCESS: Found {breed} ({confidence}%)")
             else:
-                print(">>> AI Detection failed to return valid data, using fallback breed.")
+                print(">>> AI Detection failed on all models, using default fallback.")
         except Exception as e:
-            print(f">>> Detection Exception: {e}")
-            # Keep defaults set above
+            print(f">>> Critical Detection Exception: {e}")
 
         size = str(get_size_category(breed))
         diet = generate_diet_plan(breed, size)
