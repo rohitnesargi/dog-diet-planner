@@ -57,11 +57,15 @@ if not os.path.exists(HEALTH_FILE):
     
     wb.save(HEALTH_FILE)
 
-# ======================================================
-# LOAD MODEL
-# ======================================================
+# Global model variable
+model = None
 
-model = tf.keras.applications.MobileNetV2(weights='imagenet')
+def get_model():
+    global model
+    if model is None:
+        print("Loading AI Model... This may take a moment.")
+        model = tf.keras.applications.MobileNetV2(weights='imagenet')
+    return model
 
 # ======================================================
 # USER FUNCTIONS
@@ -129,7 +133,8 @@ def predict_breed(img_path):
 
     img_array = np.expand_dims(img_array, axis=0)
 
-    predictions = model.predict(img_array)
+    model_instance = get_model()
+    predictions = model_instance.predict(img_array)
 
     decoded = decode_predictions(predictions, top=1)[0][0]
 
