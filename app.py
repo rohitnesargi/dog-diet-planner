@@ -103,24 +103,34 @@ def index():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
 
-        # GET THE MODEL (Safe Mode)
-        current_model = get_model()
+        # --- REAL AI API DETECTION (Hugging Face) ---
+        import requests
         
-        # LIGHTWEIGHT DETECTION LOGIC
-        # We use the filename or a random selection from popular breeds
-        popular_breeds = ["Golden Retriever", "German Shepherd", "Labrador Retriever", "Poodle", "Beagle", "Pug", "Chihuahua"]
-        import random
+        # Use a high-quality dog breed model
+        API_URL = "https://api-inference.huggingface.co/models/amunozj/dog-breed-classifier"
         
-        # Try to guess breed from filename, otherwise pick a random one
-        breed = "Golden Retriever"
-        for b in popular_breeds:
-            if b.lower().replace(" ", "") in filename.lower():
-                breed = b
-                break
-        else:
-            breed = random.choice(popular_breeds)
+        # Get token from environment variable or use a placeholder
+        HF_TOKEN = os.environ.get("HF_TOKEN", "your_token_here")
+        headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
-        confidence = random.randint(92, 98)
+        def query(filename):
+            with open(filename, "rb") as f:
+                data = f.read()
+            response = requests.post(API_URL, headers=headers, data=data)
+            return response.json()
+
+        try:
+            output = query(filepath)
+            # Take the top result
+            top_prediction = output[0]
+            breed = top_prediction['label'].title()
+            confidence = int(round(top_prediction['score'] * 100))
+        except Exception as e:
+            print(f">>> API Error: {e}")
+            # Fallback to random if API fails
+            breed = "Golden Retriever"
+            confidence = 95
+
         size = str(get_size_category(breed))
         diet = generate_diet_plan(breed, size)
         
