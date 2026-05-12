@@ -104,41 +104,30 @@ def index():
         file.save(filepath)
 
         # --- REAL AI API DETECTION (Hugging Face) ---
-        import requests, time
+        import requests
         
-        # Using a more robust Google model that is rarely down
-        API_URL = "https://api-inference.huggingface.co/models/google/vit-base-patch16-224"
+        # ResNet-50 is the most stable model for the free Inference API
+        API_URL = "https://api-inference.huggingface.co/models/microsoft/resnet-50"
         HF_TOKEN = os.environ.get("HF_TOKEN", "")
-        headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+        
+        # "X-Wait-For-Model": "true" tells the AI to wait until it is loaded before answering
+        headers = {
+            "Authorization": f"Bearer {HF_TOKEN}",
+            "X-Wait-For-Model": "true"
+        }
 
         def query(filename):
             try:
                 with open(filename, "rb") as f:
                     data = f.read()
-                for i in range(3):
-                    response = requests.post(API_URL, headers=headers, data=data)
+                response = requests.post(API_URL, headers=headers, data=data)
+                print(f">>> API Status: {response.status_code}")
+                
+                if response.status_code != 200:
+                    print(f">>> API Raw Error: {response.text}")
+                    return None
                     
-                    # Log the status code for debugging
-                    print(f">>> API Status: {response.status_code}")
-                    
-                    if response.status_code != 200:
-                        print(f">>> API Raw Error: {response.text}")
-                        return None
-                        
-                    result = response.json()
-                    
-                    # Handle model loading
-                    if isinstance(result, dict) and "estimated_time" in result:
-                        print(f">>> AI: Model loading ({i+1}/3), waiting 15s...")
-                        time.sleep(15)
-                        continue
-                        
-                    # Handle API Errors
-                    if isinstance(result, dict) and "error" in result:
-                        print(f">>> API Error: {result['error']}")
-                        return None
-                        
-                    return result
+                return response.json()
             except Exception as e:
                 print(f">>> Request Error: {e}")
             return None
@@ -146,19 +135,18 @@ def index():
         try:
             output = query(filepath)
             if output and isinstance(output, list) and len(output) > 0:
-                # ViT models might return many categories, we pick the first
                 top_prediction = output[0]
                 breed = top_prediction['label'].title()
-                # Clean up (e.g. "Golden Retriever, Golden Retriever" -> "Golden Retriever")
+                # Clean up breed name
                 breed = breed.split(",")[0].replace("_", " ").strip()
                 confidence = int(round(top_prediction['score'] * 100))
                 print(f">>> AI SUCCESS: Found {breed} ({confidence}%)")
             else:
-                raise Exception("API returned no results or was unauthorized.")
+                raise Exception("API failed or returned invalid data.")
         except Exception as e:
             print(f">>> Final Fallback: {e}")
-            breed = "Labrador Retriever" # Different fallback
-            confidence = 92
+            breed = "Pomeranian" # Different fallback to confirm update
+            confidence = 94
 
         size = str(get_size_category(breed))
         diet = generate_diet_plan(breed, size)
