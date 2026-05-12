@@ -106,41 +106,70 @@ def index():
         # --- REAL AI DETECTION (Hugging Face) ---
         import requests
         
-        # Using a highly stable Facebook model that works well on the Free API
-        API_URL = "https://api-inference.huggingface.co/models/facebook/convnext-tiny-224"
+        # PRIMARY MODEL: Google ViT (Highly stable for general classification)
+        API_URL = "https://api-inference.huggingface.co/models/google/vit-base-patch16-224"
+        # SECONDARY MODEL: Specialized Dog Breed Classifier (Fallback)
+        FALLBACK_API_URL = "https://api-inference.huggingface.co/models/valentinocc/dog-breed-classifier"
+        
         HF_TOKEN = os.environ.get("HF_TOKEN", "").strip()
-        headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+        headers = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
 
-        def query(filename):
+        def query(filename, url):
             try:
                 with open(filename, "rb") as f:
                     data = f.read()
-                # Added wait_for_model parameter to the request
-                response = requests.post(API_URL, headers=headers, data=data, params={"wait_for_model": "true"})
-                print(f">>> API Status: {response.status_code}")
-                if response.status_code != 200:
-                    print(f">>> API Error: {response.text}")
-                    return None
-                return response.json()
+                response = requests.post(url, headers=headers, data=data, params={"wait_for_model": "true"}, timeout=20)
+                print(f">>> API Request to {url.split('/')[-1]} - Status: {response.status_code}")
+                
+                if response.status_code == 200:
+                    return response.json()
+                elif response.status_code == 503: # Model loading
+                    print(">>> API Info: Model is loading, retrying once...")
+                    import time
+                    time.sleep(5)
+                    response = requests.post(url, headers=headers, data=data, params={"wait_for_model": "true"}, timeout=20)
+                    if response.status_code == 200: return response.json()
+                
+                print(f">>> API Error Output: {response.text[:200]}")
+                return None
             except Exception as e:
                 print(f">>> Request Error: {e}")
             return None
 
+        breed = "Labrador Retriever"
+        confidence = 92
+
         try:
-            output = query(filepath)
+            # Try Primary Model
+            output = query(filepath, API_URL)
+            
+            # If primary fails or isn't a dog, try fallback specialized model
+            is_dog_related = False
+            if output and isinstance(output, list) and len(output) > 0:
+                top_label = output[0].get('label', '').lower()
+                # Simple check if the ImageNet label is dog-related
+                dog_keywords = ['dog', 'terrier', 'retriever', 'hound', 'spaniel', 'shepherd', 'collie', 'pug', 'beagle']
+                if any(k in top_label for k in dog_keywords):
+                    is_dog_related = True
+
+            if not is_dog_related:
+                print(">>> Primary model results not clearly a dog, trying specialized model...")
+                fallback_output = query(filepath, FALLBACK_API_URL)
+                if fallback_output:
+                    output = fallback_output
+
             if output and isinstance(output, list) and len(output) > 0:
                 top_prediction = output[0]
-                breed = top_prediction['label'].title()
+                raw_breed = top_prediction['label'].title()
                 # Clean up labels (e.g. "pug, pug-dog" -> "Pug")
-                breed = breed.split(",")[0].replace("_", " ").replace("-", " ").strip()
+                breed = raw_breed.split(",")[0].replace("_", " ").replace("-", " ").strip()
                 confidence = int(round(top_prediction['score'] * 100))
                 print(f">>> AI SUCCESS: Found {breed} ({confidence}%)")
             else:
-                raise Exception("AI server busy or invalid token.")
+                print(">>> AI Detection failed to return valid data, using fallback breed.")
         except Exception as e:
-            print(f">>> Final Fallback: {e}")
-            breed = "Labrador Retriever"
-            confidence = 92
+            print(f">>> Detection Exception: {e}")
+            # Keep defaults set above
 
         size = str(get_size_category(breed))
         diet = generate_diet_plan(breed, size)
@@ -228,32 +257,74 @@ def grooming():
 def health_dashboard():
     from flask import render_template, session, redirect, url_for
     if 'user' not in session: return redirect(url_for('login'))
+    
     wb = openpyxl.load_workbook(HEALTH_FILE)
-    v_count = sum(1 for row in wb["Vaccinations"].iter_rows(min_row=2) if row[0].value == session.get('email'))
-    g_count = sum(1 for row in wb["Grooming"].iter_rows(min_row=2) if row[0].value == session.get('email'))
-    return render_template('health_dashboard.html', v_count=v_count, g_count=g_count, user=session['user'])
+    email = session.get('email')
+    
+    vaccines = []
+    for row in wb["Vaccinations"].iter_rows(min_row=2, values_only=True):
+        if row[0] == email:
+            vaccines.append({"pet": row[1], "vaccine": row[2], "date": row[3], "status": row[4]})
+            
+    grooming = []
+    for row in wb["Grooming"].iter_rows(min_row=2, values_only=True):
+        if row[0] == email:
+            grooming.append({"pet": row[1], "service": row[2], "date": row[3], "time": row[4]})
+            
+    return render_template('health_dashboard.html', vaccines=vaccines, grooming=grooming, user=session['user'])
 
 @app.route('/chatbot', methods=['GET', 'POST'])
 def chatbot():
-    from flask import render_template, request, session
-    bot_response = None
+    from flask import render_template, request, session, jsonify
     if request.method == 'POST':
-        msg = request.form.get('message', '').lower()
-        if "diet" in msg: bot_response = "I can help with diet! Just upload a dog photo on the homepage."
-        elif "hello" in msg: bot_response = "Woof! How can I help you today?"
-        else: bot_response = "I'm still learning! Try asking about diet or vaccines."
-    return render_template('chatbot.html', bot_response=bot_response, user=session.get('user'))
+        # Check if it's a JSON request from JS
+        if request.is_json:
+            data = request.get_json()
+            msg = data.get('message', '').lower()
+        else:
+            msg = request.form.get('message', '').lower()
+            
+        if "diet" in msg or "food" in msg: 
+            bot_response = "I can definitely help with diet! Just upload a clear photo of your dog on the Homepage, and I'll analyze its breed to create a custom meal plan including food types, schedules, and healthy extras."
+        elif "hello" in msg or "hi" in msg: 
+            bot_response = "Woof! Hello there! I'm your AI Pet Assistant. How can I help you and your furry friend today?"
+        elif "vaccine" in msg or "shot" in msg:
+            bot_response = "Vaccinations are crucial! You can use our Vaccination Reminder tool (under Pet Care) to track Rabies, DHPP, and more. Generally, puppies need shots every 3 weeks until 16 weeks old."
+        elif "groom" in msg or "bath" in msg:
+            bot_response = "Keeping your dog clean is important! Different breeds need different grooming frequencies. Check out our Grooming Scheduler to keep track of baths, nail trims, and haircuts."
+        elif "sick" in msg or "symptom" in msg:
+            bot_response = "If your dog seems unwell, please use our Symptom Checker first, but always consult a professional vet for serious concerns. Is there a specific symptom you're worried about?"
+        else: 
+            bot_response = "That's interesting! I'm still learning about all things dog. Try asking about 'diet', 'vaccines', 'grooming', or 'health symptoms' for more specific advice!"
+            
+        if request.is_json:
+            return jsonify({"response": bot_response})
+        return render_template('chatbot.html', bot_response=bot_response, user=session.get('user'))
+        
+    return render_template('chatbot.html', user=session.get('user'))
 
 @app.route('/disease_prediction', methods=['GET', 'POST'])
 def disease_prediction():
     from flask import render_template, request, session
-    prediction = None
+    result = None
     if request.method == 'POST':
-        symptoms = request.form.get('symptoms', '').lower()
-        if "itchy" in symptoms or "scratching" in symptoms: prediction = "Possible Skin Allergy. Consult a vet."
-        elif "vomit" in symptoms: prediction = "Digestive upset. Keep hydrated and monitor."
-        else: prediction = "Symptoms are vague. Please see a vet for a professional checkup."
-    return render_template('disease_prediction.html', prediction=prediction, user=session.get('user'))
+        symptoms = request.form.getlist('symptoms')
+        s_text = ", ".join(symptoms).lower()
+        
+        if not symptoms:
+            result = {"disease": "No Symptoms Selected", "advice": "Please select at least one symptom for analysis."}
+        elif "vomiting" in s_text and "diarrhea" in s_text:
+            result = {"disease": "Gastroenteritis", "advice": "Common in dogs. Ensure hydration with small amounts of water. If it persists for more than 24 hours, see a vet immediately."}
+        elif "itching" in s_text or "hair_loss" in s_text:
+            result = {"disease": "Skin Allergy or Mites", "advice": "Could be flea allergy or environmental triggers. Use a hypoallergenic shampoo and check for pests. Consult a vet if skin is red or bleeding."}
+        elif "coughing" in s_text or "sneezing" in s_text:
+            result = {"disease": "Kennel Cough or Respiratory Infection", "advice": "Keep your dog isolated from other pets. Monitor breathing. If lethargy or fever develops, professional treatment is needed."}
+        elif "lethargy" in s_text and "loss_of_appetite" in s_text:
+            result = {"disease": "General Malaise / Early Infection", "advice": "This can be a symptom of many things. Monitor temperature. If they don't eat for over 24 hours, please visit a vet."}
+        else:
+            result = {"disease": "Non-Specific Symptoms", "advice": "Symptoms are too broad for a specific prediction. Please monitor your pet closely and consult a vet if their condition worsens."}
+            
+    return render_template('disease_prediction.html', result=result, user=session.get('user'))
 
 @app.route('/download_report')
 def download_report():
