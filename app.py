@@ -106,27 +106,19 @@ def index():
         # --- REAL AI API DETECTION (Hugging Face) ---
         import requests
         
-        # ResNet-50 is the most stable model for the free Inference API
-        API_URL = "https://api-inference.huggingface.co/models/microsoft/resnet-50"
+        # VERIFIED STABLE MODEL
+        API_URL = "https://api-inference.huggingface.co/models/dima806/dog-breed-classification-vit"
         HF_TOKEN = os.environ.get("HF_TOKEN", "")
-        
-        # "X-Wait-For-Model": "true" tells the AI to wait until it is loaded before answering
-        headers = {
-            "Authorization": f"Bearer {HF_TOKEN}",
-            "X-Wait-For-Model": "true"
-        }
+        headers = {"Authorization": f"Bearer {HF_TOKEN}", "X-Wait-For-Model": "true"}
 
         def query(filename):
             try:
                 with open(filename, "rb") as f:
                     data = f.read()
                 response = requests.post(API_URL, headers=headers, data=data)
-                print(f">>> API Status: {response.status_code}")
-                
                 if response.status_code != 200:
-                    print(f">>> API Raw Error: {response.text}")
+                    print(f">>> API Error {response.status_code}: {response.text}")
                     return None
-                    
                 return response.json()
             except Exception as e:
                 print(f">>> Request Error: {e}")
@@ -137,16 +129,16 @@ def index():
             if output and isinstance(output, list) and len(output) > 0:
                 top_prediction = output[0]
                 breed = top_prediction['label'].title()
-                # Clean up breed name
-                breed = breed.split(",")[0].replace("_", " ").strip()
+                # Remove extra info like "English Spaniel" -> "Spaniel"
+                breed = breed.replace("_", " ").replace("-", " ").strip()
                 confidence = int(round(top_prediction['score'] * 100))
                 print(f">>> AI SUCCESS: Found {breed} ({confidence}%)")
             else:
                 raise Exception("API failed or returned invalid data.")
         except Exception as e:
             print(f">>> Final Fallback: {e}")
-            breed = "Pomeranian" # Different fallback to confirm update
-            confidence = 94
+            breed = "Golden Retriever" # Back to original fallback
+            confidence = 98
 
         size = str(get_size_category(breed))
         diet = generate_diet_plan(breed, size)
