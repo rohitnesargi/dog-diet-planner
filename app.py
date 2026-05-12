@@ -117,6 +117,14 @@ def index():
                     data = f.read()
                 for i in range(3):
                     response = requests.post(API_URL, headers=headers, data=data)
+                    
+                    # Log the status code for debugging
+                    print(f">>> API Status: {response.status_code}")
+                    
+                    if response.status_code != 200:
+                        print(f">>> API Raw Error: {response.text}")
+                        return None
+                        
                     result = response.json()
                     
                     # Handle model loading
