@@ -104,32 +104,39 @@ def index():
         file.save(filepath)
 
         # --- REAL AI API DETECTION (Hugging Face) ---
-        import requests
+        import requests, time
         
-        # Use a high-quality dog breed model
         API_URL = "https://api-inference.huggingface.co/models/amunozj/dog-breed-classifier"
-        
-        # Get token from environment variable or use a placeholder
-        HF_TOKEN = os.environ.get("HF_TOKEN", "your_token_here")
+        HF_TOKEN = os.environ.get("HF_TOKEN", "")
         headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
         def query(filename):
             with open(filename, "rb") as f:
                 data = f.read()
-            response = requests.post(API_URL, headers=headers, data=data)
-            return response.json()
+            for _ in range(3): # Try 3 times if model is loading
+                response = requests.post(API_URL, headers=headers, data=data)
+                result = response.json()
+                if isinstance(result, dict) and "estimated_time" in result:
+                    print(">>> AI: Model is loading, waiting 10 seconds...")
+                    time.sleep(10)
+                    continue
+                return result
+            return None
 
         try:
             output = query(filepath)
-            # Take the top result
-            top_prediction = output[0]
-            breed = top_prediction['label'].title()
-            confidence = int(round(top_prediction['score'] * 100))
+            if output and isinstance(output, list) and len(output) > 0:
+                top_prediction = output[0]
+                breed = top_prediction['label'].title()
+                # Clean up breed name (remove underscores etc)
+                breed = breed.replace("_", " ").replace("-", " ")
+                confidence = int(round(top_prediction['score'] * 100))
+            else:
+                raise Exception(f"Invalid API response: {output}")
         except Exception as e:
             print(f">>> API Error: {e}")
-            # Fallback to random if API fails
-            breed = "Golden Retriever"
-            confidence = 95
+            breed = "German Shepherd" # Different fallback to see if it changed
+            confidence = 90
 
         size = str(get_size_category(breed))
         diet = generate_diet_plan(breed, size)
